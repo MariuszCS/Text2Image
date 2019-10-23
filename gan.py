@@ -25,6 +25,7 @@ words_to_remove = ["a", "an", "the"]
 annotations_per_image = 5
 epochs = 1000
 batch_size = 32
+d_label_smooting = 0.3
 image_input_shape = (32, 32, 3, )
 image_output_shape = (32, 32, 3, )
 text_input_shape = (16, 300, 1, )
@@ -60,37 +61,37 @@ def generator():
     network_g = BatchNormalization()(network_g)
     #network_g = BatchNormalization()(network_g)
     network_g = Dropout(0.5)(network_g)
-    network_g = Conv2D(64, (3, 3), strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_g)
+    network_g = Conv2D(64, (3, 3), activation="relu", strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_g)
     network_g = BatchNormalization()(network_g)
     # size 16x16x64
 
     network_g = Conv2D(128, (3, 3), activation="relu", kernel_initializer=initial_weights, padding='same')(network_g)
     network_g = BatchNormalization()(network_g)
-    network_g = Conv2D(128, (3, 3), strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_g)
+    network_g = Conv2D(128, (3, 3), activation="relu", strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_g)
     network_g = BatchNormalization()(network_g)
     # size 8x8x128
 
     network_g = Conv2D(256, (3, 3), activation="relu", kernel_initializer=initial_weights, padding='same')(network_g)
     network_g = BatchNormalization()(network_g)
-    network_g = Conv2D(256, (3, 3), strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_g)
+    network_g = Conv2D(256, (3, 3), activation="relu", strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_g)
     network_g = BatchNormalization()(network_g)
     # size 4x4x256
     network_g = Dropout(0.5)(network_g)
     network_g = Conv2D(512, (3, 3), activation="relu", kernel_initializer=initial_weights, padding='same')(network_g)
     network_g = BatchNormalization()(network_g)
-    network_g = Conv2DTranspose(512, (3, 3), strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_g)
+    network_g = Conv2DTranspose(512, (3, 3), activation="relu", strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_g)
     network_g = BatchNormalization()(network_g)
     # size 8x8x512
 
     network_g = Conv2D(256, (3, 3), activation="relu", kernel_initializer=initial_weights, padding='same')(network_g)
     network_g = BatchNormalization()(network_g)
-    network_g = Conv2DTranspose(256, (3, 3), strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_g)
+    network_g = Conv2DTranspose(256, (3, 3), activation="relu", strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_g)
     network_g = BatchNormalization()(network_g)
     # size 16x16x256
 
     network_g = Conv2D(128, (3, 3), activation="relu", kernel_initializer=initial_weights, padding='same')(network_g)
     network_g = BatchNormalization()(network_g)
-    network_g = Conv2DTranspose(128, (3, 3), strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_g)
+    network_g = Conv2DTranspose(128, (3, 3), activation="relu", strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_g)
     network_g = BatchNormalization()(network_g)
     # size 32x32x128
     network_g = Dropout(0.5)(network_g)
@@ -124,18 +125,18 @@ def discriminator():
     network_d = Conv2D(64, (5, 5), activation=lrelu, kernel_initializer=initial_weights, padding='same')(concatenated_input_d)
     network_d = BatchNormalization()(network_d)
     network_d = Dropout(0.5)(network_d)
-    network_d = Conv2D(64, (3, 3), strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_d)
+    network_d = Conv2D(64, (3, 3), activation=lrelu, strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_d)
     network_d = BatchNormalization()(network_d)
     # size 16x16x64
 
     network_d = Conv2D(128, (3, 3), activation=lrelu, kernel_initializer=initial_weights, padding='same')(network_d)
     network_d = Dropout(0.5)(network_d)
     network_d = BatchNormalization()(network_d)
-    network_d = Conv2D(128, (3, 3), strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_d)
+    network_d = Conv2D(256, (3, 3), activation=lrelu, strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_d)
     network_d = BatchNormalization()(network_d)
     # size 8x8x128
-
-    network_d = Conv2D(128, (3, 3), strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_d)
+    network_d = Conv2D(256, (3, 3), activation=lrelu, kernel_initializer=initial_weights, padding='same')(network_d)
+    network_d = Conv2D(128, (3, 3), activation=lrelu, strides=(2, 2), kernel_initializer=initial_weights, padding='same')(network_d)
     network_d = BatchNormalization()(network_d)
     # size 4x4x128
     network_d = Conv2D(64, (3, 3), activation=lrelu, kernel_initializer=initial_weights, padding='same')(network_d)
@@ -261,6 +262,7 @@ def plot_generated_images(epoch=1, generator=None, coco=None, vector_representat
         plt.tight_layout()
         plt.savefig(output_dir + 'image_{}_{}.png'.format(epoch, annotation))
         i += 1
+    plt.close("all")
 
 
 def train(generator=None, discriminator=None, gan=None, epochs=1000, batch_size=1):
@@ -268,8 +270,13 @@ def train(generator=None, discriminator=None, gan=None, epochs=1000, batch_size=
     coco = COCO(annotations_file_path)
     image_ids = coco.getImgIds()
     samples_nr = int((len(image_ids) / batch_size) / 5)
-    real = np.ones((batch_size, 1))
-    generated = np.zeros((batch_size, 1))
+    #real = np.ones((batch_size, 1))
+    #generated = np.zeros((batch_size, 1))
+
+    #One-sided label smoothing
+    real_d = np.ones((batch_size, 1)) - random.uniform(0, d_label_smooting)
+    real_g = np.ones((batch_size, 1))
+    generated = np.zeros((batch_size, 1)) + random.uniform(0, d_label_smooting)
 
     for epoch in range(epochs):
         tmp_image_ids = image_ids[:]
@@ -282,9 +289,15 @@ def train(generator=None, discriminator=None, gan=None, epochs=1000, batch_size=
             annotations_embbeddings, _ = get_annotations_embbeddings(coco, vector_representations, chosen_image_ids)
 
             generated_images = generator.predict([input_noise, annotations_embbeddings])
-
-            discriminator_loss_real, _ = discriminator.train_on_batch([images, annotations_embbeddings], real)
-            discriminator_loss_generated, _ = discriminator.train_on_batch([generated_images, annotations_embbeddings], generated)
+            discriminator_loss_real = 0
+            discriminator_loss_generated = 0
+            flip_labels = (random.randint(0, 50) == 13)
+            if flip_labels:
+                discriminator_loss_real, _ = discriminator.train_on_batch([images, annotations_embbeddings], generated)
+                discriminator_loss_generated, _ = discriminator.train_on_batch([generated_images, annotations_embbeddings], real_d)
+            else:
+                discriminator_loss_real, _ = discriminator.train_on_batch([images, annotations_embbeddings], real_d)
+                discriminator_loss_generated, _ = discriminator.train_on_batch([generated_images, annotations_embbeddings], generated)
 
             for chosen_image_id in chosen_image_ids:
                 tmp_image_ids.remove(chosen_image_id)
@@ -292,9 +305,10 @@ def train(generator=None, discriminator=None, gan=None, epochs=1000, batch_size=
             chosen_image_ids = random.sample(tmp_image_ids, batch_size)
             annotations_embbeddings, _ = get_annotations_embbeddings(coco, vector_representations, chosen_image_ids)
 
-            generator_loss = gan.train_on_batch([input_noise, annotations_embbeddings], real)
+            generator_loss = gan.train_on_batch([input_noise, annotations_embbeddings], real_g)
 
-            print ("epoch = %d, sample_nr = %d of %d, d_r=%.3f, d_g=%.3f g=%.3f" % (epoch, sample_nr, samples_nr, discriminator_loss_real, discriminator_loss_generated, generator_loss))
+            print ("epoch = %d, sample_nr = %d of %d, d_r = %.3f, d_g = %.3f g = %.3f, fliped = %r" \
+                % (epoch, sample_nr, samples_nr, discriminator_loss_real, discriminator_loss_generated, generator_loss, flip_labels))
             
         discriminator.save_weights('discriminator_weights.h5')
         gan.save_weights('gan_weights.h5')
